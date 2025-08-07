@@ -1,3 +1,4 @@
+# [All necessary imports]
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -56,7 +57,14 @@ if uploaded_file:
         X = df_state[features]
         y = df_state[target]
 
-        split_index = int(len(df_state) * train_size / 100)
+        # Final check for numeric and finite values
+        X = X.apply(pd.to_numeric, errors='coerce')
+        y = pd.to_numeric(y, errors='coerce')
+        mask = np.isfinite(X).all(axis=1) & np.isfinite(y)
+        X = X[mask]
+        y = y[mask]
+
+        split_index = int(len(X) * train_size / 100)
         X_train, X_test = X[:split_index], X[split_index:]
         y_train, y_test = y[:split_index], y[split_index:]
 
@@ -67,6 +75,7 @@ if uploaded_file:
             conf = max(0, min(1, r2)) * 100
             return rmse, mae, r2, conf
 
+        # Model training
         if model_choice in ["LSTM", "GRU", "Hybrid"]:
             scaler_X = MinMaxScaler()
             scaler_y = MinMaxScaler()
