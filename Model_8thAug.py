@@ -41,9 +41,10 @@ if uploaded_file:
     df.dropna(inplace=True)
 
     # Feature Engineering
-    df['Hour'] = df.index.hour if isinstance(df.index, pd.DatetimeIndex) else pd.to_datetime(df.iloc[:, 0]).dt.hour
-    df['DayOfWeek'] = pd.to_datetime(df.iloc[:, 0]).dt.dayofweek
-    df['Month'] = pd.to_datetime(df.iloc[:, 0]).dt.month
+    df['Datetime'] = pd.to_datetime(df.iloc[:, 0])
+    df['Hour'] = df['Datetime'].dt.hour
+    df['DayOfWeek'] = df['Datetime'].dt.dayofweek
+    df['Month'] = df['Datetime'].dt.month
     df['IsPeakHour'] = df['Hour'].isin([8, 9, 10, 18, 19, 20]).astype(int)
     df['IsWorkingDay'] = ((df['Weekend Tag'] == 0) & (df['Holiday Tag'] == 0)).astype(int)
     df['Demand Lag-1'] = df['Hourly Demand Met (in MW)'].shift(1)
@@ -67,11 +68,9 @@ if uploaded_file:
     target = 'Hourly Demand Met (in MW)'
 
     st.subheader("📊 Variables Used in the Model")
-    st.markdown(f"""
-    - **Original Features:** {', '.join(original_features)}
-    - **Derived Features:** {', '.join(derived_features)}
-    - **Target Variable:** {target}
-    """)
+    st.markdown(f"- **Original Features:** {', '.join(original_features)}")
+    st.markdown(f"- **Derived Features:** {', '.join(derived_features)}")
+    st.markdown(f"- **Target Variable:** {target}")
 
     X = df[all_features]
     y = df[target]
@@ -195,7 +194,8 @@ if uploaded_file:
     actual_total = np.sum(y_test_actual)
     predicted_total = np.sum(y_pred)
     savings = actual_total - predicted_total
+    impact_type = "Saved" if savings > 0 else "Excess"
+    impact_value = abs(savings)
 
     st.markdown(f"""
-    - **Total Actual Demand:** {actual_total:.2f} MW  
-    - **Total Predicted Demand:** {predicted_total:.2f}
+- **Total Actual Demand:** {actual_total:.2f} MW  
