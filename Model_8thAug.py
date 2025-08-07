@@ -2,11 +2,10 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.linear_model import LinearRegression
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.svm import SVR
+from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import xgboost as xgb
 from statsmodels.tsa.statespace.sarimax import SARIMAX
 from statsmodels.tsa.arima.model import ARIMA
@@ -53,8 +52,7 @@ if uploaded_file:
         X = df_state[features]
         y = df_state[target]
 
-        X = X.apply(pd.to_numeric, errors='coerce')
-        y = pd.to_numeric(y, errors='coerce')
+        # Ensure all values are finite
         mask = np.isfinite(X).all(axis=1) & np.isfinite(y)
         X = X[mask]
         y = y[mask]
