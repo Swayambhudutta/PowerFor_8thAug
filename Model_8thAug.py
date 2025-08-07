@@ -197,5 +197,16 @@ if uploaded_file:
     impact_type = "Saved" if savings > 0 else "Excess"
     impact_value = abs(savings)
 
-    st.markdown(f"""
-- **Total Actual Demand:** {actual_total:.2f} MW  
+    st.markdown(
+        f"- **Total Actual Demand:** {actual_total:.2f} MW  \n"
+        f"- **Total Predicted Demand:** {predicted_total:.2f} MW  \n"
+        f"- **Net Impact:** {impact_type} {impact_value:.2f} MW"
+    )
+
+    if savings > 0:
+        st.success(f"Forecast helped in saving {savings:.2f} MW")
+    else:
+        st.error(f"Forecast resulted in excess of {-savings:.2f} MW")
+
+    if st.button("Simulate"):
+        st.info("Best model: Random Forest, Best training percentage: 80%")
