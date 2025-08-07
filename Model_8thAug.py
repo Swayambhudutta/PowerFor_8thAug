@@ -46,11 +46,11 @@ if uploaded_file:
         state_choice = st.radio("Choose State", ["Delhi", "Maharashtra"], horizontal=True)
 
         df_state = df[df['State'] == state_choice].copy()
-        df_state.dropna(inplace=True)
 
         features = ['temperature_2m (°C)', 'rain (mm)', 'DNI', 'Weekend Tag', 'Holiday Tag']
         target = 'Hourly Demand Met (in MW)'
 
+        # Ensure numeric and drop NaNs
         df_state[features + [target]] = df_state[features + [target]].apply(pd.to_numeric, errors='coerce')
         df_state.dropna(subset=features + [target], inplace=True)
 
@@ -67,14 +67,14 @@ if uploaded_file:
             r2 = r2_score(y_true, y_pred)
             conf = max(0, min(1, r2)) * 100
             return rmse, mae, r2, conf
+
         if model_choice in ["LSTM", "GRU", "Hybrid"]:
             scaler_X = MinMaxScaler()
             scaler_y = MinMaxScaler()
             X_scaled = scaler_X.fit_transform(X)
             y_scaled = scaler_y.fit_transform(y.values.reshape(-1, 1))
 
-            X_seq = []
-            y_seq = []
+            X_seq, y_seq = [], []
             for i in range(24, len(X_scaled)):
                 X_seq.append(X_scaled[i-24:i])
                 y_seq.append(y_scaled[i])
@@ -87,9 +87,9 @@ if uploaded_file:
             def build_model(cell_type='LSTM'):
                 model = Sequential()
                 if cell_type == 'LSTM':
-                    model.add(LSTM(50, return_sequences=False, input_shape=(X_train_seq.shape[1], X_train_seq.shape[2])))
+                    model.add(LSTM(50, input_shape=(X_train_seq.shape[1], X_train_seq.shape[2])))
                 else:
-                    model.add(GRU(50, return_sequences=False, input_shape=(X_train_seq.shape[1], X_train_seq.shape[2])))
+                    model.add(GRU(50, input_shape=(X_train_seq.shape[1], X_train_seq.shape[2])))
                 model.add(Dense(1))
                 model.compile(optimizer='adam', loss='mse')
                 return model
@@ -97,15 +97,13 @@ if uploaded_file:
             if model_choice == "LSTM":
                 model = build_model('LSTM')
                 model.fit(X_train_seq, y_train_seq, epochs=10, batch_size=32, verbose=0)
-                y_pred_scaled = model.predict(X_test_seq)
-                y_pred = scaler_y.inverse_transform(y_pred_scaled)
+                y_pred = scaler_y.inverse_transform(model.predict(X_test_seq))
                 y_test_actual = scaler_y.inverse_transform(y_test_seq)
 
             elif model_choice == "GRU":
                 model = build_model('GRU')
                 model.fit(X_train_seq, y_train_seq, epochs=10, batch_size=32, verbose=0)
-                y_pred_scaled = model.predict(X_test_seq)
-                y_pred = scaler_y.inverse_transform(y_pred_scaled)
+                y_pred = scaler_y.inverse_transform(model.predict(X_test_seq))
                 y_test_actual = scaler_y.inverse_transform(y_test_seq)
 
             elif model_choice == "Hybrid":
@@ -115,9 +113,8 @@ if uploaded_file:
 
                 xgb_model = xgb.XGBRegressor()
                 xgb_model.fit(X_train, y_train)
-                xgb_pred = xgb_model.predict(X_test)
+                xgb_pred = xgb_model.predict(X_test)[-len(lstm_pred):]
 
-                xgb_pred = xgb_pred[-len(lstm_pred):]
                 y_pred = (lstm_pred.flatten() + xgb_pred) / 2
                 y_test_actual = y_test.values[-len(y_pred):]
 
@@ -146,10 +143,10 @@ if uploaded_file:
 
         # Evaluation
         rmse, mae, r2, conf = evaluate(y_test_actual, y_pred)
-        rmse_placeholder.metric("RMSE", f"{rmse:.2f}")
-        mae_placeholder.metric("MAE", f"{mae:.2f}")
-        r2_placeholder.metric("R² Score", f"{r2:.2f}")
-        conf_placeholder.metric("Estimated Accuracy", f"{conf:.1f}% (CI ~70%)")
+        rmse_placeholder.markdown(f"<p style='font-size:14px;'>RMSE: <b>{rmse:.2f}</b></p>", unsafe_allow_html=True)
+        mae_placeholder.markdown(f"<p style='font-size:14px;'>MAE: <b>{mae:.2f}</b></p>", unsafe_allow_html=True)
+        r2_placeholder.markdown(f"<p style='font-size:14px;'>R² Score: <b>{r2:.2f}</b></p>", unsafe_allow_html=True)
+        conf_placeholder.markdown(f"<p style='font-size:14px;'>Estimated Accuracy: <b>{conf:.1f}%</b> (CI ~70%)</p>", unsafe_allow_html=True)
 
         if r2 < 0.3:
             insights = "Low Accuracy: High error and low correlation. Consider alternative models or preprocessing."
@@ -169,24 +166,4 @@ if uploaded_file:
         st.plotly_chart(fig, use_container_width=True)
 
         st.markdown(f"**Disclaimer:** Trained on {train_size}% ({len(y_train)} points), Forecasted on {100-train_size}% ({len(y_test_actual)} points)")
-        st.markdown("**Data Sources:** ICED Niti Aayog, Open Meteo, officeholidays")
-
-        # Forecast Impact
-        st.subheader("Forecast Impact")
-        actual_total = np.sum(y_test_actual)
-        predicted_total = np.sum(y_pred)
-        savings = actual_total - predicted_total
-
-        st.markdown(f"""
-        - **Total Actual Demand:** {actual_total:.2f} MW  
-        - **Total Predicted Demand:** {predicted_total:.2f} MW  
-        - **Net Impact:** {"Saved" if savings > 0 else "Excess"} {abs(savings):.2f} MW
-        """)
-
-        if savings > 0:
-            st.success(f"Forecast helped in saving {savings:.2f} MW")
-        else:
-            st.error(f"Forecast resulted in excess of {-savings:.2f} MW")
-
-        if st.button("Simulate"):
-            st.info("Best model: Random Forest, Best training percentage: 80%")
+        st.markdown("**Data Sources:** ICED Niti Aay
