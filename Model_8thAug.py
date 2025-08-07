@@ -25,7 +25,7 @@ with st.sidebar:
                                 ["ARIMA", "SARIMAX", "Random Forest", "Linear Regression", "SVR", "XGBoost", "LSTM", "GRU", "Hybrid"])
     train_size = st.slider("Training Data Percentage", 10, 90, 70)
 
-    st.markdown("<h4 style='font-size:16px;'>Accuracy Metrics</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 style='font-size:14px;'>Accuracy Metrics</h4>", unsafe_allow_html=True)
     rmse_placeholder = st.empty()
     mae_placeholder = st.empty()
     r2_placeholder = st.empty()
@@ -40,10 +40,40 @@ if uploaded_file:
     df = pd.read_excel(uploaded_file, engine='openpyxl')
     df.dropna(inplace=True)
 
-    features = ['temperature_2m (°C)', 'rain (mm)', 'DNI', 'Weekend Tag', 'Holiday Tag']
+    # Feature Engineering
+    df['Hour'] = df.index.hour if isinstance(df.index, pd.DatetimeIndex) else pd.to_datetime(df.iloc[:, 0]).dt.hour
+    df['DayOfWeek'] = pd.to_datetime(df.iloc[:, 0]).dt.dayofweek
+    df['Month'] = pd.to_datetime(df.iloc[:, 0]).dt.month
+    df['IsPeakHour'] = df['Hour'].isin([8, 9, 10, 18, 19, 20]).astype(int)
+    df['IsWorkingDay'] = ((df['Weekend Tag'] == 0) & (df['Holiday Tag'] == 0)).astype(int)
+    df['Demand Lag-1'] = df['Hourly Demand Met (in MW)'].shift(1)
+    df['Demand Lag-24'] = df['Hourly Demand Met (in MW)'].shift(24)
+    df['Rolling Mean 3h'] = df['Hourly Demand Met (in MW)'].rolling(window=3).mean()
+    df['Rolling Std 3h'] = df['Hourly Demand Met (in MW)'].rolling(window=3).std()
+    df['Temp × Hour'] = df['temperature_2m (°C)'] * df['Hour']
+    df['Rain × Cloud'] = df['rain (mm)'] * df.get('cloud_cover (%)', 1)
+    df['DNI × Solar'] = df['DNI'] * df.get('solar_radiation (W/m²)', 1)
+
+    df.dropna(inplace=True)
+
+    # Feature list
+    derived_features = [
+        'Hour', 'DayOfWeek', 'Month', 'IsPeakHour', 'IsWorkingDay',
+        'Demand Lag-1', 'Demand Lag-24', 'Rolling Mean 3h', 'Rolling Std 3h',
+        'Temp × Hour', 'Rain × Cloud', 'DNI × Solar'
+    ]
+    original_features = ['temperature_2m (°C)', 'rain (mm)', 'DNI', 'Weekend Tag', 'Holiday Tag']
+    all_features = original_features + derived_features
     target = 'Hourly Demand Met (in MW)'
 
-    X = df[features]
+    st.subheader("📊 Variables Used in the Model")
+    st.markdown(f"""
+    - **Original Features:** {', '.join(original_features)}
+    - **Derived Features:** {', '.join(derived_features)}
+    - **Target Variable:** {target}
+    """)
+
+    X = df[all_features]
     y = df[target]
 
     split_index = int(len(df) * train_size / 100)
@@ -54,7 +84,7 @@ if uploaded_file:
         rmse = np.sqrt(mean_squared_error(y_true, y_pred))
         mae = mean_absolute_error(y_true, y_pred)
         r2 = r2_score(y_true, y_pred)
-        conf = max(0, min(1, r2)) * 100  # Confidence-like interpretation
+        conf = max(0, min(1, r2)) * 100
         return rmse, mae, r2, conf
 
     if model_choice in ["LSTM", "GRU", "Hybrid"]:
@@ -63,8 +93,7 @@ if uploaded_file:
         X_scaled = scaler_X.fit_transform(X)
         y_scaled = scaler_y.fit_transform(y.values.reshape(-1, 1))
 
-        X_seq = []
-        y_seq = []
+        X_seq, y_seq = [], []
         for i in range(24, len(X_scaled)):
             X_seq.append(X_scaled[i-24:i])
             y_seq.append(y_scaled[i])
@@ -169,14 +198,4 @@ if uploaded_file:
 
     st.markdown(f"""
     - **Total Actual Demand:** {actual_total:.2f} MW  
-    - **Total Predicted Demand:** {predicted_total:.2f} MW  
-    - **Net Impact:** {"Saved" if savings > 0 else "Excess"} {abs(savings):.2f} MW
-    """)
-
-    if savings > 0:
-        st.success(f"Forecast helped in saving {savings:.2f} MW")
-    else:
-        st.error(f"Forecast resulted in excess of {-savings:.2f} MW")
-
-    if st.button("Simulate"):
-        st.info("Best model: Random Forest, Best training percentage: 80%")
+    - **Total Predicted Demand:** {predicted_total:.2f}
