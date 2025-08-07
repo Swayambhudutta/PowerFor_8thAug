@@ -1,4 +1,3 @@
-# [All necessary imports]
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -15,11 +14,9 @@ from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, GRU, Dense
 from sklearn.preprocessing import MinMaxScaler
 
-# Page config
 st.set_page_config(layout="wide")
 st.title("Short-Term Intra-Day Forecast of Power Demand")
 
-# Sidebar
 with st.sidebar:
     st.markdown("<h4 style='font-size:16px;'>Model Configuration</h4>", unsafe_allow_html=True)
     model_choice = st.selectbox("Choose Forecasting Model", 
@@ -35,7 +32,6 @@ with st.sidebar:
     st.markdown("<h4 style='font-size:16px;'>Model Insights</h4>", unsafe_allow_html=True)
     insights_placeholder = st.empty()
 
-# File uploader
 uploaded_file = st.file_uploader("Upload Power Demand Excel File", type=["xlsx"])
 if uploaded_file:
     df = pd.read_excel(uploaded_file, engine='openpyxl')
@@ -57,7 +53,6 @@ if uploaded_file:
         X = df_state[features]
         y = df_state[target]
 
-        # Final check for numeric and finite values
         X = X.apply(pd.to_numeric, errors='coerce')
         y = pd.to_numeric(y, errors='coerce')
         mask = np.isfinite(X).all(axis=1) & np.isfinite(y)
@@ -75,7 +70,6 @@ if uploaded_file:
             conf = max(0, min(1, r2)) * 100
             return rmse, mae, r2, conf
 
-        # Model training
         if model_choice in ["LSTM", "GRU", "Hybrid"]:
             scaler_X = MinMaxScaler()
             scaler_y = MinMaxScaler()
@@ -149,7 +143,6 @@ if uploaded_file:
                 y_pred = model.predict(X_test)
                 y_test_actual = y_test
 
-        # Evaluation
         rmse, mae, r2, conf = evaluate(y_test_actual, y_pred)
         rmse_placeholder.markdown(f"<p style='font-size:14px;'>RMSE: <b>{rmse:.2f}</b></p>", unsafe_allow_html=True)
         mae_placeholder.markdown(f"<p style='font-size:14px;'>MAE: <b>{mae:.2f}</b></p>", unsafe_allow_html=True)
@@ -164,7 +157,6 @@ if uploaded_file:
             insights = "High Accuracy: Model performs well on the data."
         insights_placeholder.info(insights)
 
-        # Plot
         st.subheader(f"Forecast vs Actual using {model_choice} for {state_choice}")
         fig = go.Figure()
         fig.add_trace(go.Scatter(y=np.asarray(y_test_actual).flatten(), name='Actual'))
@@ -176,7 +168,6 @@ if uploaded_file:
         st.markdown(f"**Disclaimer:** Trained on {train_size}% ({len(y_train)} points), Forecasted on {100-train_size}% ({len(y_test_actual)} points)")
         st.markdown("**Data Sources:** ICED Niti Aayog, Open Meteo, officeholidays")
 
-        # Forecast Impact
         st.subheader("Forecast Impact")
         actual_total = np.sum(y_test_actual)
         predicted_total = np.sum(y_pred)
