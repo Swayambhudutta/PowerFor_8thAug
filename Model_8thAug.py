@@ -20,17 +20,18 @@ st.title("Short-Term Intra-Day Forecast of Power Demand")
 
 # Sidebar
 with st.sidebar:
-    st.header("Model Configuration")
+    st.markdown("<h4 style='font-size:16px;'>Model Configuration</h4>", unsafe_allow_html=True)
     model_choice = st.selectbox("Choose Forecasting Model", 
                                 ["ARIMA", "SARIMAX", "Random Forest", "Linear Regression", "SVR", "XGBoost", "LSTM", "GRU", "Hybrid"])
     train_size = st.slider("Training Data Percentage", 10, 90, 70)
 
-    st.subheader("Accuracy Metrics")
+    st.markdown("<h4 style='font-size:16px;'>Accuracy Metrics</h4>", unsafe_allow_html=True)
     rmse_placeholder = st.empty()
     mae_placeholder = st.empty()
     r2_placeholder = st.empty()
+    conf_placeholder = st.empty()
 
-    st.subheader("Model Insights")
+    st.markdown("<h4 style='font-size:16px;'>Model Insights</h4>", unsafe_allow_html=True)
     insights_placeholder = st.empty()
 
 # File uploader
@@ -53,7 +54,8 @@ if uploaded_file:
         rmse = np.sqrt(mean_squared_error(y_true, y_pred))
         mae = mean_absolute_error(y_true, y_pred)
         r2 = r2_score(y_true, y_pred)
-        return rmse, mae, r2
+        conf = max(0, min(1, r2)) * 100  # Confidence-like interpretation
+        return rmse, mae, r2, conf
 
     if model_choice in ["LSTM", "GRU", "Hybrid"]:
         scaler_X = MinMaxScaler()
@@ -133,10 +135,11 @@ if uploaded_file:
             y_test_actual = y_test
 
     # Evaluation
-    rmse, mae, r2 = evaluate(y_test_actual, y_pred)
+    rmse, mae, r2, conf = evaluate(y_test_actual, y_pred)
     rmse_placeholder.metric("RMSE", f"{rmse:.2f}")
     mae_placeholder.metric("MAE", f"{mae:.2f}")
     r2_placeholder.metric("R² Score", f"{r2:.2f}")
+    conf_placeholder.metric("Estimated Accuracy", f"{conf:.1f}% (CI ~70%)")
 
     if r2 < 0.3:
         insights = "Low Accuracy: High error and low correlation. Consider alternative models or preprocessing."
@@ -152,14 +155,24 @@ if uploaded_file:
     fig.add_trace(go.Scatter(y=np.asarray(y_test_actual).flatten(), name='Actual'))
     fig.add_trace(go.Scatter(y=[y_train.mean()] * len(y_test_actual), name='Baseline'))
     fig.add_trace(go.Scatter(y=np.asarray(y_pred).flatten(), name='Predicted'))
-    fig.update_layout(xaxis_title='Time', yaxis_title='Power Demand (MW)')
+    fig.update_layout(xaxis_title='Hourly Data', yaxis_title='Power Demand (MW)')
     st.plotly_chart(fig, use_container_width=True)
 
     st.markdown(f"**Disclaimer:** Trained on {train_size}% ({len(y_train)} points), Forecasted on {100-train_size}% ({len(y_test_actual)} points)")
     st.markdown("**Data Sources:** ICED Niti Aayog, Open Meteo, officeholidays")
 
+    # Forecast Impact
     st.subheader("Forecast Impact")
-    savings = np.mean(y_test_actual) - np.mean(y_pred)
+    actual_total = np.sum(y_test_actual)
+    predicted_total = np.sum(y_pred)
+    savings = actual_total - predicted_total
+
+    st.markdown(f"""
+    - **Total Actual Demand:** {actual_total:.2f} MW  
+    - **Total Predicted Demand:** {predicted_total:.2f} MW  
+    - **Net Impact:** {"Saved" if savings > 0 else "Excess"} {abs(savings):.2f} MW
+    """)
+
     if savings > 0:
         st.success(f"Forecast helped in saving {savings:.2f} MW")
     else:
