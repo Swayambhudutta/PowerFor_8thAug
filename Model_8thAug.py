@@ -97,17 +97,14 @@ if uploaded_file:
             y_test_actual = scaler_y.inverse_transform(y_test_seq)
 
         elif model_choice == "Hybrid":
-            # LSTM
             lstm_model = build_model('LSTM')
             lstm_model.fit(X_train_seq, y_train_seq, epochs=10, batch_size=32, verbose=0)
             lstm_pred = scaler_y.inverse_transform(lstm_model.predict(X_test_seq))
 
-            # XGBoost
             xgb_model = xgb.XGBRegressor()
-            xgb_model.fit(X_train.reshape(X_train.shape[0], -1), y_train)
-            xgb_pred = xgb_model.predict(X_test.reshape(X_test.shape[0], -1))
+            xgb_model.fit(X_train, y_train)
+            xgb_pred = xgb_model.predict(X_test)
 
-            # Align lengths
             xgb_pred = xgb_pred[-len(lstm_pred):]
             y_pred = (lstm_pred.flatten() + xgb_pred) / 2
             y_test_actual = y_test.values[-len(y_pred):]
@@ -152,9 +149,9 @@ if uploaded_file:
     # Plot
     st.subheader(f"Forecast vs Actual using {model_choice}")
     fig = go.Figure()
-    fig.add_trace(go.Scatter(y=np.array(y_test_actual).flatten(), name='Actual'))
+    fig.add_trace(go.Scatter(y=np.asarray(y_test_actual).flatten(), name='Actual'))
     fig.add_trace(go.Scatter(y=[y_train.mean()] * len(y_test_actual), name='Baseline'))
-    fig.add_trace(go.Scatter(y=y_pred.flatten(), name='Predicted'))
+    fig.add_trace(go.Scatter(y=np.asarray(y_pred).flatten(), name='Predicted'))
     fig.update_layout(xaxis_title='Time', yaxis_title='Power Demand (MW)')
     st.plotly_chart(fig, use_container_width=True)
 
@@ -162,7 +159,7 @@ if uploaded_file:
     st.markdown("**Data Sources:** ICED Niti Aayog, Open Meteo, officeholidays")
 
     st.subheader("Forecast Impact")
-    savings = y_test_actual.mean() - np.mean(y_pred)
+    savings = np.mean(y_test_actual) - np.mean(y_pred)
     if savings > 0:
         st.success(f"Forecast helped in saving {savings:.2f} MW")
     else:
