@@ -40,13 +40,20 @@ if uploaded_file:
     df = pd.read_excel(uploaded_file, engine='openpyxl')
     df.dropna(inplace=True)
 
+    # State selection
+    st.subheader("Select State for Forecasting")
+    state_choice = st.radio("Choose State", ["Delhi", "Maharashtra"], horizontal=True)
+
+    # Filter data by state
+    df_state = df[df['State'] == state_choice]
+
     features = ['temperature_2m (°C)', 'rain (mm)', 'DNI', 'Weekend Tag', 'Holiday Tag']
     target = 'Hourly Demand Met (in MW)'
 
-    X = df[features]
-    y = df[target]
+    X = df_state[features]
+    y = df_state[target]
 
-    split_index = int(len(df) * train_size / 100)
+    split_index = int(len(df_state) * train_size / 100)
     X_train, X_test = X[:split_index], X[split_index:]
     y_train, y_test = y[:split_index], y[split_index:]
 
@@ -150,7 +157,7 @@ if uploaded_file:
     insights_placeholder.info(insights)
 
     # Plot
-    st.subheader(f"Forecast vs Actual using {model_choice}")
+    st.subheader(f"Forecast vs Actual using {model_choice} for {state_choice}")
     fig = go.Figure()
     fig.add_trace(go.Scatter(y=np.asarray(y_test_actual).flatten(), name='Actual'))
     fig.add_trace(go.Scatter(y=[y_train.mean()] * len(y_test_actual), name='Baseline'))
