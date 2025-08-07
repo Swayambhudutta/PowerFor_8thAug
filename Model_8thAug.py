@@ -40,8 +40,17 @@ if uploaded_file:
     df = pd.read_excel(uploaded_file, engine='openpyxl')
     df.dropna(inplace=True)
 
+    # Safe datetime parsing
+    for col in df.columns:
+        try:
+            df['Datetime'] = pd.to_datetime(df[col], errors='coerce')
+            if df['Datetime'].notna().sum() > 0:
+                break
+        except Exception:
+            continue
+    df.dropna(subset=['Datetime'], inplace=True)
+
     # Feature Engineering
-    df['Datetime'] = pd.to_datetime(df.iloc[:, 0])
     df['Hour'] = df['Datetime'].dt.hour
     df['DayOfWeek'] = df['Datetime'].dt.dayofweek
     df['Month'] = df['Datetime'].dt.month
@@ -111,7 +120,6 @@ if uploaded_file:
             model.add(Dense(1))
             model.compile(optimizer='adam', loss='mse')
             return model
-
         if model_choice == "LSTM":
             model = build_model('LSTM')
             model.fit(X_train_seq, y_train_seq, epochs=10, batch_size=32, verbose=0)
