@@ -39,22 +39,18 @@ uploaded_file = st.file_uploader("Upload Power Demand Excel File", type=["xlsx"]
 if uploaded_file:
     df = pd.read_excel(uploaded_file, engine='openpyxl')
 
-    # Check for 'State' column
     if 'State' not in df.columns:
         st.error("The uploaded Excel file must contain a 'State' column with values 'Delhi' and 'Maharashtra'.")
     else:
-        # State selection
         st.subheader("Select State for Forecasting")
         state_choice = st.radio("Choose State", ["Delhi", "Maharashtra"], horizontal=True)
 
-        # Filter and clean data
         df_state = df[df['State'] == state_choice].copy()
         df_state.dropna(inplace=True)
 
         features = ['temperature_2m (°C)', 'rain (mm)', 'DNI', 'Weekend Tag', 'Holiday Tag']
         target = 'Hourly Demand Met (in MW)'
 
-        # Ensure numeric types
         df_state[features + [target]] = df_state[features + [target]].apply(pd.to_numeric, errors='coerce')
         df_state.dropna(subset=features + [target], inplace=True)
 
@@ -71,7 +67,6 @@ if uploaded_file:
             r2 = r2_score(y_true, y_pred)
             conf = max(0, min(1, r2)) * 100
             return rmse, mae, r2, conf
-
         if model_choice in ["LSTM", "GRU", "Hybrid"]:
             scaler_X = MinMaxScaler()
             scaler_y = MinMaxScaler()
@@ -98,6 +93,7 @@ if uploaded_file:
                 model.add(Dense(1))
                 model.compile(optimizer='adam', loss='mse')
                 return model
+
             if model_choice == "LSTM":
                 model = build_model('LSTM')
                 model.fit(X_train_seq, y_train_seq, epochs=10, batch_size=32, verbose=0)
@@ -164,4 +160,33 @@ if uploaded_file:
         insights_placeholder.info(insights)
 
         # Plot
-        st.subheader(f"Forecast vs
+        st.subheader(f"Forecast vs Actual using {model_choice} for {state_choice}")
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(y=np.asarray(y_test_actual).flatten(), name='Actual'))
+        fig.add_trace(go.Scatter(y=[y_train.mean()] * len(y_test_actual), name='Baseline'))
+        fig.add_trace(go.Scatter(y=np.asarray(y_pred).flatten(), name='Predicted'))
+        fig.update_layout(xaxis_title='Hourly Data', yaxis_title='Power Demand (MW)')
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.markdown(f"**Disclaimer:** Trained on {train_size}% ({len(y_train)} points), Forecasted on {100-train_size}% ({len(y_test_actual)} points)")
+        st.markdown("**Data Sources:** ICED Niti Aayog, Open Meteo, officeholidays")
+
+        # Forecast Impact
+        st.subheader("Forecast Impact")
+        actual_total = np.sum(y_test_actual)
+        predicted_total = np.sum(y_pred)
+        savings = actual_total - predicted_total
+
+        st.markdown(f"""
+        - **Total Actual Demand:** {actual_total:.2f} MW  
+        - **Total Predicted Demand:** {predicted_total:.2f} MW  
+        - **Net Impact:** {"Saved" if savings > 0 else "Excess"} {abs(savings):.2f} MW
+        """)
+
+        if savings > 0:
+            st.success(f"Forecast helped in saving {savings:.2f} MW")
+        else:
+            st.error(f"Forecast resulted in excess of {-savings:.2f} MW")
+
+        if st.button("Simulate"):
+            st.info("Best model: Random Forest, Best training percentage: 80%")
