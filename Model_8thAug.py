@@ -152,7 +152,7 @@ if uploaded_file:
     # Plot
     st.subheader(f"Forecast vs Actual using {model_choice}")
     fig = go.Figure()
-    fig.add_trace(go.Scatter(y=y_test_actual.flatten(), name='Actual'))
+    fig.add_trace(go.Scatter(y=np.array(y_test_actual).flatten(), name='Actual'))
     fig.add_trace(go.Scatter(y=[y_train.mean()] * len(y_test_actual), name='Baseline'))
     fig.add_trace(go.Scatter(y=y_pred.flatten(), name='Predicted'))
     fig.update_layout(xaxis_title='Time', yaxis_title='Power Demand (MW)')
